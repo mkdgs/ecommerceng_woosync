@@ -33,6 +33,11 @@ ECommercengWoocommerceStatus=Stato per lo shop [%s]
 ECommercengWoocommerceDescription=Descrizione lunga shop
 ECommercengWoocommerceShortDescription=Descrizione breve shop
 ECommercengWoocommerceOnlinePayment=Pagamento online
+ECommercengWoocommerceOnlinePaymentDate=Date de Paiement en ligne
+ECommercengWoocommerceOnlinePaymentMethodTitle=Nom de la méthode de paiment
+ECommercengWoocommerceOnlinePaymentMethod=ID méthode de paiment
+ECommercengWoocommerceOnlinePaymentTransactionID=Id de la transaction
+ECommercengWoocommerceOnlinePaymentSiteId=ID ecommerce
 ECommercengWoocommerceTaxClass=Aliquota IVA per lo shop [%s]
 
 ECommercengWoocommerceDictTaxClass=Elenco aliquote IVA su Woocommerce
