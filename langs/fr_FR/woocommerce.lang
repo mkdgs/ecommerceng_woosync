@@ -34,6 +34,11 @@ ECommercengWoocommerceStatus=Statut pour le site [%s]
 ECommercengWoocommerceDescription=Description boutique
 ECommercengWoocommerceShortDescription=Description courte boutique
 ECommercengWoocommerceOnlinePayment=Paiement en ligne
+ECommercengWoocommerceOnlinePaymentDate=Date de Paiement en ligne
+ECommercengWoocommerceOnlinePaymentMethodTitle=Nom de la méthode de paiment
+ECommercengWoocommerceOnlinePaymentMethod=ID méthode de paiment
+ECommercengWoocommerceOnlinePaymentTransactionID=Id de la transaction
+ECommercengWoocommerceOnlinePaymentSiteId=ID ecommerce
 ECommercengWoocommerceTaxClass=Classe de TVA pour le site [%s]
 
 ECommercengWoocommerceDictTaxClass=Liste des classes de TVA sur Woocommerce
