@@ -1,5 +1,5 @@
 -- ===================================================================
--- Copyright (C) 2010 Auguria <franck.charpentier@auguria.net>
+-- Copyright (C) 2011 Auguria <anthony.poiret@auguria.net>
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
 -- the Free Software Foundation; either version 2 of the License, or
@@ -16,11 +16,4 @@
 --
 -- ===================================================================
 
-CREATE TABLE llx_ecommerce_socpeople (
-  rowid integer unsigned NOT NULL auto_increment PRIMARY KEY,
-  fk_socpeople integer unsigned NOT NULL,
-  fk_site integer unsigned NOT NULL,
-  remote_id varchar(255) NOT NULL,
-  type integer unsigned NOT NULL DEFAULT 1,
-  last_update datetime default NULL
-) ENGINE=InnoDB COMMENT='Table transition remote site -  Dolibarr';
+ALTER TABLE llx_ecommerceng_payment_gateways ADD UNIQUE INDEX uk_c_ecommerceng_payment_gateways(site_id,payment_gateway_id,entity);

@@ -1,5 +1,5 @@
 -- ===================================================================
--- Copyright (C) 2010 Auguria <franck.charpentier@auguria.net>
+-- Copyright (C) 2020 Open-Dsi <support@open-dsi.fr>
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
 -- the Free Software Foundation; either version 2 of the License, or
@@ -16,11 +16,21 @@
 --
 -- ===================================================================
 
-CREATE TABLE llx_ecommerce_socpeople (
-  rowid integer unsigned NOT NULL auto_increment PRIMARY KEY,
-  fk_socpeople integer unsigned NOT NULL,
-  fk_site integer unsigned NOT NULL,
-  remote_id varchar(255) NOT NULL,
-  type integer unsigned NOT NULL DEFAULT 1,
-  last_update datetime default NULL
-) ENGINE=InnoDB COMMENT='Table transition remote site -  Dolibarr';
+create table llx_ecommerce_pending_webhooks
+(
+	rowid 				integer AUTO_INCREMENT PRIMARY KEY,
+	site_id				integer			NOT NULL,
+	delivery_id			varchar(255)	NOT NULL,
+	webhook_id 			varchar(255)	NOT NULL,
+	webhook_topic    	varchar(255)	NOT NULL,
+	webhook_resource 	varchar(255)	NOT NULL,
+	webhook_event	   	varchar(255)	NOT NULL,
+	webhook_data		text			NOT NULL,
+	webhook_signature	varchar(255)	NOT NULL,
+	webhook_source     	varchar(255)	NOT NULL,
+	status				integer(4)		NOT NULL DEFAULT 0,
+	datep				datetime		NULL,
+	datee				datetime		NULL,
+	error_msg			text			NULL,
+	datec				datetime		NOT NULL
+) ENGINE=InnoDB;
