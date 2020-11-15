@@ -4764,7 +4764,12 @@ class eCommerceSynchro {
                                                 $payment->amounts = array($invoice->id => $invoice->total_ttc);   // Array with all payments dispatching with invoice id
                                                 $payment->multicurrency_amounts = array();   // Array with all payments dispatching
                                                 $payment->paiementid = $invoice->mode_reglement_id;
-                                                $payment->num_paiement = '';
+                                                // $payment->num_paiement = $invoice->array_options['options_ecommerceng_online_payment_transaction_id_' . $conf->entity]; # mkdgs
+    /// $order_data['transaction_id'];//
+                                                $ref = ( empty($invoice->array_options['options_ecommerceng_online_payment_transaction_id_' . $conf->entity]) ) ? '' : $invoice->array_options['options_ecommerceng_online_payment_transaction_id_' . $conf->entity];
+                                                $payment->num_paiement = 'ref: '.$ref; # mkdgs
+                                                //$payment->type_label =  $invoice->mode_reglement_id;
+                                                //$payment->type_code = $ref;
                                                 $payment->note = 'Created by WooSync';
 
                                                 $payment_id = $payment->create($this->user, 1);
@@ -4775,7 +4780,7 @@ class eCommerceSynchro {
                                                     $this->errors = array_merge($this->errors, $payment->errors);
                                                     $error++;
                                                 } else {
-                                                    $result = $payment->addPaymentToBank($this->user, 'payment', '(CustomerInvoicePayment)', $bank_account_id, '', '');
+                                                    $result = $payment->addPaymentToBank($this->user, 'payment', '(CustomerInvoicePayment)', $bank_account_id, $ref, '');
                                                     if ($result < 0) {
                                                         $this->errors[] = $this->langs->trans('ECommerceErrorInvoiceAddPaymentToBank');
                                                         if (!empty($payment->error))
