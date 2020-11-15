@@ -1551,7 +1551,7 @@ class eCommerceSynchro {
                         }
                     }
 
-                    
+
                     if (empty($error)) {
                         // trigger after update of an order (processing invoice,shippment etc..)
                         $dBCommande->call_trigger('ORDER_SYNCH_SUCCESS', $user);
@@ -3366,11 +3366,11 @@ class eCommerceSynchro {
                         }
 
                         $last_sync_date = 'ECOMMERCE_LAST_SYNC_DATE_PRODUCT_' . $this->eCommerceSite->id;
-              
-                            $sync_date = $product_data['create_date'];
-                            if (!empty($product_data['last_update'])) {
-                                $sync_date = strtotime($product_data['last_update']);
-                            }
+
+                        $sync_date = $product_data['create_date'];
+                        if (!empty($product_data['last_update'])) {
+                            $sync_date = strtotime($product_data['last_update']);
+                        }
 
                         if (!$error && !$bypass && $conf->global->$last_sync_date < $sync_date) {
                             $result = dolibarr_set_const($this->db, $last_sync_date, $sync_date, 'chaine', 0, '', $conf->entity);
@@ -3872,20 +3872,24 @@ class eCommerceSynchro {
                                                         $error++;
                                                     }
                                                 }
-                                                // Classify billed
-                                                if (!$error && empty($order->billed) && $order_data['billed'] == 1) {
-                                                    $result = $order->classifyBilled($this->user);
-                                                    if ($result < 0) {
-                                                        $this->errors[] = $this->langs->trans('ECommerceErrorClassifyOrderBilled');
-                                                        if (!empty($order->error))
-                                                            $this->errors[] = $order->error;
-                                                        $this->errors = array_merge($this->errors, $order->errors);
-                                                        $error++;
-                                                    }
-                                                }
                                             }
                                         }
                                     }
+
+
+                                    // Classify billed, if not already
+                                    if (!$error && empty($order->billed) && $order_data['billed'] == 1) {
+                                        $result = $order->classifyBilled($this->user);
+                                        if ($result < 0) {
+                                            $this->errors[] = $this->langs->trans('ECommerceErrorClassifyOrderBilled');
+                                            if (!empty($order->error))
+                                                $this->errors[] = $order->error;
+                                            $this->errors = array_merge($this->errors, $order->errors);
+                                            $error++;
+                                        }
+                                    }
+
+
 
                                     // Set payment mode
                                     if (!$error && !$payment_methods_already_set && $payment_method_id > 0 && $order->statut >= 0) {
@@ -3903,7 +3907,7 @@ class eCommerceSynchro {
                                     if (!$error) {
                                         // Search or create the third party for customer contact
                                         $contact_data = $order_data['socpeopleCommande'];
-                                        
+
                                         $result = $this->getThirdPartyByEmailOrName($contact_data['email'], $contact_data['company']);
                                         if ($result < 0) {
                                             $error++;
@@ -5181,7 +5185,7 @@ class eCommerceSynchro {
                                 }
                             }
 
-                           
+
                             $last_sync_date = 'ECOMMERCE_LAST_SYNC_DATE_ORDER_' . $this->eCommerceSite->id;
                             $sync_date = $order_data['create_date'];
                             if (!empty($order_data['remote_order']->date_modified)) {
@@ -5280,8 +5284,8 @@ class eCommerceSynchro {
         if (empty($name)) {
             return 0;
         }
-        
-        if ( $name === 'Particulier') {
+
+        if ($name === 'Particulier') {
             return 0;
         }
         // Search by name
@@ -5337,7 +5341,7 @@ class eCommerceSynchro {
         // Search by name
         if ($result == 0)
             $result = $this->getThirdPartyByName($name, $site_id);
-        
+
         if ($result <= 0) {
             return 0;
         }

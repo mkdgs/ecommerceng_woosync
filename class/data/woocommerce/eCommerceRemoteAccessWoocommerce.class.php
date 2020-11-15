@@ -153,6 +153,11 @@ class eCommerceRemoteAccessWoocommerce {
      */
     private static $taxes_rates_by_class_cached;
 
+    static protected function dateFormat($timestamp, $format = '') {
+        date_default_timezone_set('Europe/Paris');
+        return date('Y-m-d H:i:s', $timestamp);
+    }
+
     /**
      * Constructor
      * @param   DoliDB          $db     Database handler
@@ -218,11 +223,10 @@ class eCommerceRemoteAccessWoocommerce {
                 'wp_api' => true,
                 'version' => 'wc/v2',
                 'timeout' => $response_timeout,
-                'query_string_auth' => true,//!empty($conf->global->ECOMMERCENG_WOOCOMMERCE_QUERY_STRING_AUTH),
+                'query_string_auth' => true, //!empty($conf->global->ECOMMERCENG_WOOCOMMERCE_QUERY_STRING_AUTH),
                     ]
             );
             $this->client->get('customers', ['page' => 1, 'per_page' => 1]);
-
         } catch (HttpClientException $fault) {
             $this->errors[] = $langs->trans('ECommerceWoocommerceConnect', $this->site->name, $fault->getCode() . ': ' . $fault->getMessage());
             dol_syslog(__METHOD__ .
@@ -257,8 +261,8 @@ class eCommerceRemoteAccessWoocommerce {
      * @return  array|boolean               List of companies ID to update or false if error
      */
     public function getSocieteToUpdate($fromDate, $toDate) {
-        dol_syslog(__METHOD__ . ": start gt = " . (!empty($fromDate) ? dol_print_date($fromDate, 'standard') : 'none') .
-                ", lt = " . (!empty($toDate) ? dol_print_date($toDate, 'standard') : 'none') . " for site ID {$this->site->id}", LOG_DEBUG);
+        dol_syslog(__METHOD__ . ": start gt = " . (!empty($fromDate) ? self::dateFormat($fromDate, 'standard') : 'none') .
+                ", lt = " . (!empty($toDate) ? self::dateFormat($toDate, 'standard') : 'none') . " for site ID {$this->site->id}", LOG_DEBUG);
         global $conf, $langs;
 
         $this->errors = array();
@@ -267,8 +271,8 @@ class eCommerceRemoteAccessWoocommerce {
         $result = [];
         $idxPage = 1;
         $per_page = empty($conf->global->ECOMMERCENG_MAXSIZE_MULTICALL) ? 100 : min($conf->global->ECOMMERCENG_MAXSIZE_MULTICALL, 100);
-        $from_date = isset($fromDate) && !empty($fromDate) ? new DateTime(dol_print_date($fromDate, 'standard')) : null;
-        $to_date = isset($toDate) && !empty($toDate) ? new DateTime(dol_print_date($toDate, 'standard')) : null;
+        $from_date = isset($fromDate) && !empty($fromDate) ? new DateTime(self::dateFormat($fromDate, 'standard')) : null;
+        $to_date = isset($toDate) && !empty($toDate) ? new DateTime(self::dateFormat($toDate, 'standard')) : null;
 
         $no_more = false;
         while (true) {
@@ -300,7 +304,7 @@ class eCommerceRemoteAccessWoocommerce {
                 if ($from_date == $date_customer) {
                     if ($this->eCommerceSociete->fetchByRemoteId($id, $this->site->id) > 0) {
                         if (isset($this->eCommerceSociete->last_update) && !empty($this->eCommerceSociete->last_update)) {
-                            $date = new DateTime(dol_print_date($this->eCommerceSociete->last_update, 'standard'));
+                            $date = new DateTime(self::dateFormat($this->eCommerceSociete->last_update, 'standard'));
                             if ($date < $from_date) {
                                 $update_customer = true;
                             }
@@ -344,8 +348,8 @@ class eCommerceRemoteAccessWoocommerce {
      */
     public function getProductToUpdate($fromDate, $toDate) {
 
-        dol_syslog(__METHOD__ . ": start gt = " . (!empty($fromDate) ? dol_print_date($fromDate, 'standard') : 'none') .
-                ", lt = " . (!empty($toDate) ? dol_print_date($toDate, 'standard') : 'none') . " for site ID {$this->site->id}", LOG_DEBUG);
+        dol_syslog(__METHOD__ . ": start gt = " . (!empty($fromDate) ? self::dateFormat($fromDate, 'standard') : 'none') .
+                ", lt = " . (!empty($toDate) ? self::dateFormat($toDate, 'standard') : 'none') . " for site ID {$this->site->id}", LOG_DEBUG);
         global $conf, $langs;
 
         $this->errors = array();
@@ -355,14 +359,14 @@ class eCommerceRemoteAccessWoocommerce {
         $result = [];
         $idxPage = 1;
         $per_page = empty($conf->global->ECOMMERCENG_MAXSIZE_MULTICALL) ? 100 : min($conf->global->ECOMMERCENG_MAXSIZE_MULTICALL, 100);
-        $from_date = isset($fromDate) && !empty($fromDate) ? new DateTime(dol_print_date($fromDate, 'standard')) : null;
-        $to_date = isset($toDate) && !empty($toDate) ? new DateTime(dol_print_date($toDate, 'standard')) : null;
+        $from_date = isset($fromDate) && !empty($fromDate) ? new DateTime(self::dateFormat($fromDate, 'standard')) : null;
+        $to_date = isset($toDate) && !empty($toDate) ? new DateTime(self::dateFormat($toDate, 'standard')) : null;
 
         $filter = ['per_page' => $per_page, 'status' => 'publish']; #mkdgs 
         if (isset($fromDate) && !empty($fromDate))
-            $filter['after'] = dol_print_date($fromDate - (24 * 60 * 60), 'dayrfc');
+            $filter['after'] = self::dateFormat($fromDate - (24 * 60 * 60), 'dayrfc');
         if (isset($toDate) && !empty($toDate))
-            $filter['before'] = dol_print_date($toDate + (24 * 60 * 60), 'dayrfc');
+            $filter['before'] = self::dateFormat($toDate + (24 * 60 * 60), 'dayrfc');
 
         $filter['page'] = $idxPage++;
         while (true) {
@@ -388,7 +392,7 @@ class eCommerceRemoteAccessWoocommerce {
                 if ($from_date == $date_product) {
                     if ($this->eCommerceProduct->fetchByRemoteId($id, $this->site->id) > 0) {
                         if (isset($this->eCommerceProduct->last_update) && !empty($this->eCommerceProduct->last_update)) {
-                            $date = new DateTime(dol_print_date($this->eCommerceProduct->last_update, 'standard'));
+                            $date = new DateTime(self::dateFormat($this->eCommerceProduct->last_update, 'standard'));
                             if ($date < $from_date) {
                                 $update_parent = true;
                             }
@@ -414,7 +418,7 @@ class eCommerceRemoteAccessWoocommerce {
                     if ($from_date == $date_product) {
                         if ($this->eCommerceProduct->fetchByRemoteId($id, $this->site->id) > 0) {
                             if (isset($this->eCommerceProduct->last_update) && !empty($this->eCommerceProduct->last_update)) {
-                                $date = new DateTime(dol_print_date($this->eCommerceProduct->last_update, 'standard'));
+                                $date = new DateTime(self::dateFormat($this->eCommerceProduct->last_update, 'standard'));
                                 if ($date < $from_date) {
                                     $update_variante = true;
                                 }
@@ -459,8 +463,8 @@ class eCommerceRemoteAccessWoocommerce {
      * @return  array|boolean               List of orders ID to update or false if error
      */
     public function getCommandeToUpdate($fromDate, $toDate) {
-        dol_syslog(__METHOD__ . ": start gt = " . (!empty($fromDate) ? dol_print_date($fromDate, 'standard') : 'none') .
-                ", lt = " . (!empty($toDate) ? dol_print_date($toDate, 'standard') : 'none') . " for site ID {$this->site->id}", LOG_DEBUG);
+        dol_syslog(__METHOD__ . ": start gt = " . (!empty($fromDate) ? self::dateFormat($fromDate, 'standard') : 'none') .
+                ", lt = " . (!empty($toDate) ? self::dateFormat($toDate, 'standard') : 'none') . " for site ID {$this->site->id}", LOG_DEBUG);
         global $conf, $langs;
 
         $this->errors = array();
@@ -469,20 +473,20 @@ class eCommerceRemoteAccessWoocommerce {
         $result = [];
         $idxPage = 1;
         $per_page = empty($conf->global->ECOMMERCENG_MAXSIZE_MULTICALL) ? 100 : min($conf->global->ECOMMERCENG_MAXSIZE_MULTICALL, 100);
-        $from_date = isset($fromDate) && !empty($fromDate) ? new DateTime(dol_print_date($fromDate, 'standard')) : null;
-        $to_date = isset($toDate) && !empty($toDate) ? new DateTime(dol_print_date($toDate, 'standard')) : null;
+        $from_date = isset($fromDate) && !empty($fromDate) ? new DateTime(self::dateFormat($fromDate, 'standard')) : null;
+        $to_date = isset($toDate) && !empty($toDate) ? new DateTime(self::dateFormat($toDate, 'standard')) : null;
 
         $filter = ['per_page' => $per_page];
         if (isset($fromDate) && !empty($fromDate))
-            $filter['after'] = dol_print_date($fromDate - (24 * 60 * 60), 'dayrfc');
+            $filter['after'] = self::dateFormat($fromDate - (24 * 60 * 60), 'dayrfc');
         if (isset($toDate) && !empty($toDate))
-            $filter['before'] = dol_print_date($toDate + (24 * 60 * 60), 'dayrfc');
+            $filter['before'] = self::dateFormat($toDate + (24 * 60 * 60), 'dayrfc');
 
-        $filter['page'] =  $idxPage++;
+        $filter['page'] = $idxPage++;
         while (true) {
             try {
-                $page = $this->client->get('orders', $filter );
-            } catch (HttpClientException $fault) {      
+                $page = $this->client->get('orders', $filter);
+            } catch (HttpClientException $fault) {
                 $this->errors[] = $langs->trans('ECommerceWoocommerceGetCommandeToUpdate', $this->site->name, $fault->getCode() . ': ' . $fault->getMessage());
                 dol_syslog(__METHOD__ .
                         ': Error:' . $langs->transnoentitiesnoconv('ECommerceWoocommerceGetCommandeToUpdate', $this->site->name, $fault->getCode() . ': ' . $fault->getMessage()) .
@@ -501,7 +505,7 @@ class eCommerceRemoteAccessWoocommerce {
                 if ($from_date == $date_order) {
                     if ($this->eCommerceCommande->fetchByRemoteId($id, $this->site->id) > 0) {
                         if (isset($this->eCommerceCommande->last_update) && !empty($this->eCommerceCommande->last_update)) {
-                            $date = new DateTime(dol_print_date($this->eCommerceCommande->last_update, 'standard'));
+                            $date = new DateTime(self::dateFormat($this->eCommerceCommande->last_update, 'standard'));
                             if ($date < $from_date) {
                                 $update_order = true;
                             }
@@ -557,8 +561,8 @@ class eCommerceRemoteAccessWoocommerce {
         $this->errors = array();
         $companies = [];
         $nb_max_by_request = empty($conf->global->ECOMMERCENG_MAXSIZE_MULTICALL) ? 100 : min($conf->global->ECOMMERCENG_MAXSIZE_MULTICALL, 100);
-        $from_date = isset($from_date) && !empty($from_date) ? dol_print_date($from_date,  'standard') : null;
-        $to_date = isset($to_date) && !empty($to_date) ? dol_print_date($to_date,  'standard') : null;
+        $from_date = isset($from_date) && !empty($from_date) ? self::dateFormat($from_date, 'standard') : null;
+        $to_date = isset($to_date) && !empty($to_date) ? self::dateFormat($to_date, 'standard') : null;
 
         $filters = [
             'per_page' => $nb_max_by_request,
@@ -776,8 +780,8 @@ class eCommerceRemoteAccessWoocommerce {
         $this->errors = array();
         $products = [];
         $nb_max_by_request = empty($conf->global->ECOMMERCENG_MAXSIZE_MULTICALL) ? 100 : min($conf->global->ECOMMERCENG_MAXSIZE_MULTICALL, 100);
-        $from_date = isset($from_date) ? dol_print_date($from_date,  'standard') : null;
-        $to_date = isset($to_date) ? dol_print_date($to_date,  'standard') : null;
+        $from_date = isset($from_date) ? self::dateFormat($from_date, 'standard') : null;
+        $to_date = isset($to_date) ? self::dateFormat($to_date, 'standard') : null;
 
         $include_ids = [];
         $include_variation_ids = [];
@@ -815,7 +819,14 @@ class eCommerceRemoteAccessWoocommerce {
         while (true) {
             try {
                 $filters['page'] = $idxPage++;
-                $page = $this->client->get('products', $filters);                
+                $page = $this->client->get('products', $filters);
+/*
+                echo '<pre>';
+                echo print_r($filters);
+                echo print_r($page);
+                echo '</pre>';
+                die('----tricky debug');
+ */
             } catch (HttpClientException $fault) {
                 $this->errors[] = $langs->trans('ECommerceWoocommerceConvertRemoteObjectIntoDolibarrProduct', $this->site->name, $fault->getCode() . ': ' . $fault->getMessage());
                 dol_syslog(__METHOD__ .
@@ -826,6 +837,8 @@ class eCommerceRemoteAccessWoocommerce {
 
             if (!isset($page) || count($page) == 0)
                 break;
+
+
 
             foreach ($page as $product) {
                 // Don't synchronize the variation parent
@@ -1067,8 +1080,8 @@ class eCommerceRemoteAccessWoocommerce {
         $this->errors = array();
         $orders = [];
         $nb_max_by_request = empty($conf->global->ECOMMERCENG_MAXSIZE_MULTICALL) ? 100 : min($conf->global->ECOMMERCENG_MAXSIZE_MULTICALL, 100);
-        $from_date = isset($from_date) ? dol_print_date($from_date, 'standard') : null;
-        $to_date = isset($to_date) ? dol_print_date($to_date, 'standard') : null;
+        $from_date = isset($from_date) ? self::dateFormat($from_date, 'standard') : null;
+        $to_date = isset($to_date) ? self::dateFormat($to_date, 'standard') : null;
 
         $filters = [
             'per_page' => $nb_max_by_request,
@@ -1092,6 +1105,13 @@ class eCommerceRemoteAccessWoocommerce {
             try {
                 $filters['page'] = $idxPage++;
                 $page = $this->client->get('orders', $filters);
+              /*  
+                echo '<pre>';
+                echo print_r($filters);
+                echo print_r($page);
+                echo '</pre>';
+                die('----tricky debug');
+ */
             } catch (HttpClientException $fault) {
                 $this->errors[] = $langs->trans('ECommerceWoocommerceConvertRemoteObjectIntoDolibarrCommande', $this->site->name, $fault->getCode() . ': ' . $fault->getMessage());
                 dol_syslog(__METHOD__ .
@@ -1521,7 +1541,6 @@ class eCommerceRemoteAccessWoocommerce {
                 "ecommerceng_online_payment_method_title_{$conf->entity}" => $remote_data->payment_method_title,
                 "ecommerceng_online_payment_transaction_id_{$conf->entity}" => $remote_data->transaction_id,
                 "ecommerceng_online_payment_date_{$conf->entity}" => $remote_data->date_paid,
-                        
                 "ecommerceng_online_payment_{$conf->entity}" => empty($remote_data->date_paid) ? 0 : 1,
                 "ecommerceng_wc_status_{$this->site->id}_{$conf->entity}" => $orderStatus,
                 "ecommerceng_wc_link_{$this->site->id}_{$conf->entity}" => rtrim($this->site->webservice_address, '/') . '/wp-admin/post.php?action=edit&post=' . $remote_data->id,
@@ -2436,7 +2455,7 @@ class eCommerceRemoteAccessWoocommerce {
                         $extrafield_value = $value;
                         // Specific Altairis - Begin
                         if (!empty($extrafield_value) && ($cr_key == 'rental_start' || $cr_key == 'rental_end')) {
-                            $extrafield_value = dol_print_date($extrafield_value, 'day');
+                            $extrafield_value = self::dateFormat($extrafield_value, 'day');
                         }
                         // Specific Altairis - End
 
@@ -2507,7 +2526,7 @@ class eCommerceRemoteAccessWoocommerce {
 
         $this->errors = array();
         try {
-            $results = $this->client->get('products',  ['sku' => $object->ref ] );
+            $results = $this->client->get('products', ['sku' => $object->ref]);
         } catch (HttpClientException $fault) {
             $this->errors[] = $langs->trans('ECommerceWoocommerceCheckRemoteProductExist', $this->site->name, $fault->getCode() . ': ' . $fault->getMessage());
             dol_syslog(__METHOD__ .
