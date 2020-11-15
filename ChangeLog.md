@@ -1,5 +1,120 @@
 # ChangeLog
 
+## 4.0.50.0
+- Correction lors de l'ajout d'un produit depuis WooCommerce (nettoie les charactères en utf8mb4 dans la description et la description courte)
+- Ajout de la variable globale ECOMMERCE_PROCESSING_WEBHOOK_SYNCHRONIZATION_WITHOUT_ERRORS pour desactivé la reprise des lignes de synchro des webhooks qui ont eu une erreur préalablement lors de la prochaine synchro des webhooks
+- Correction de la creation du reglement de la facture fournisseur
+
+## 4.0.49.0
+- Correction de l'ajout des lignes de la facture lorsque l'on ne créer pas de commande
+- Correction de la creation des factures fournisseurs
+- Correction lors du lancement de la tache planifier de syncho des webhooks
+
+## 4.0.48.0
+- Correction du cron de synchronisation de la file d'attente
+- Correction du prix d'achat des produits lors de la synchronisation des commandes
+- Correction du classement des factures en payées si les factures ont un montant égale à 0
+- Correction du compatibilité v10+ lors de l'envoi du mail de la facture lors de la synchronisation d'une commande
+
+## 4.0.47.0
+- Reecriture de la synchronisation des produits, tiers, commandes pour le support des webhooks de WooCommerce (Creation et actualisation des commandes)
+- Ajout de la gestion des codes promos sur les commandes (de WooCommerce vers Dolibarr seulement)
+- Ajout du support de l'extension WooCommerce "PW WooCommerce Gift Cards Pro" (de WooCommerce vers Dolibarr seulement)
+- Ajout du support de l'extension WooCommerce "WooCommerce Cost of Goods" (de WooCommerce vers Dolibarr seulement)
+- Nouvelle gestion des TVA
+- Ajout de la variable ECOMMERCE_KEEP_NEGATIVE_PRICE_LINES_WHEN_CREATE_INVOICE pour ne pas creer des reductions clients pour des lignes avec des prix négatifs lors de la création de la facture
+
+## 4.0.46.0
+- Ajout de la variable globale ECOMMERCENG_WOOCOMMERCE_QUERY_STRING_AUTH pour passer les identifiants dans l'url
+
+## 4.0.45.0
+- Correction lorsque de la synchronisation des tiers si le tiers trouvé par l'adresse email est le tiers par défaut (deplacement du contact avec l'adresse email dans le nouveau tiers ou aillant le même nom si c'est une companie).
+
+## 4.0.44.0
+- Correction lors de la recuperation du compte bancaire pour la creation des paiements sur la facture a la synchronisation d'une commande.
+- Correction mineure
+- Fix update product with UGS code and variations fail by mkdgs
+
+## 4.0.43.0
+- Correction de la mise a jour du statut "virtuel" du produit sur WooCommerce si le produit Dolibarr est un service
+
+## 4.0.42.1
+- Mise à jour de la documentation
+
+## 4.0.42.0
+- Correction de l'ajout du lien de la catégorie racine des produits
+
+## 4.0.41.0
+- Add Italian translations file (module version 4.0.34) by aschio
+- Fix on order modification configuration is ignored by mkdgs
+- Fix work with other custom dirs by altatof
+- Fix create mother category link
+
+## 4.0.40.0
+- Ajout du choix des roles utilisateurs synchronisés dans les options du site.
+- Seul les clients des roles supportés seront synchronisés.
+- Seules les commandes invités ou ceux dont le client est enregistré seront synchronisées.
+- Correction si la commande n'a pas de mode de paiement lors de la synchro.
+
+## 4.0.39.0
+- Correction de la récupération des frais stripe
+- Correction mineure
+
+## 4.0.38.0
+- Correction de la récupération des modes de paiements de la boutique (libellé et ne recupère que ceux activés)
+- Correction de la recherche du produit/service utilisé pour les frais de la facture fournisseur
+
+## 4.0.37.0
+- Ajout d'un bouton de mise à jour manuellement depuis un site sur la fiche du tiers
+- Ajout d'une option pour ajout un utilisateur de type "Responsable suivi commande client" lors de la création d'une commande lors d'une synchro
+
+## 4.0.36.0
+- Suppression de la variable ECOMMERCENG_SHIPPING_NOT_DISPLAY_IF_NULL (n'affiche pas de frais de port si la quantité est a 0 (pas de frais de port))
+- Ajout de la gestion des modes de payments
+- Ajout de la possibilité de créer une facture et une facture fournisseur pour les frais lors de la synchronisation de la commande
+- Possibilité de ne créer que la facture
+- Possibilité d'envoyer automatiquement la facture par email au client
+- Suppression des extrafields, des modes de paiements et des tva liés au site lors sa suppression
+
+## 4.0.35.0
+
+- Correction des stocks lors des mises à jour avec les boutiques (arrondie à l'inferieur si le stock à des decimales)
+- Ajout d'un script de mises à jour de tous les produits vers les boutiques.
+- Correction des valeurs par default à la création d'un site.
+
+## 4.0.34.0
+
+- Correction de la modification de la ref dans le cas ou la boutique envoie une ref vide sur un produit deja synchronisé vers Dolibarr.
+
+## 4.0.33.0
+
+- Correction de la recherche des contacts d'une commande lors de sa synchronisation depuis Woocommerce.
+
+## 4.0.32.0
+
+- Correction des droits d'accès à la page de configuration des sites.
+
+## 4.0.31.0
+
+- Ajout de la variable global pour envoyer l'authorisation de connection vers l'API de WordPress dans les paramètres de l'URL avec OAUTH_WORDPRESS_AUTHORIZATION_METHOD_QUERY_STRING.
+- Correction lors de la synchronisation des produits de WooCommerce vers Dolibarr lorsque le paramètrage du sens de synchronisation de la référence du produit à été mis sur 'De Dolibarr vers ECommerce'.
+
+## 4.0.30.0
+
+- Modification et deplacement des menus.
+- Mise à jour et corrections variées par Ewake.
+- Correction de la prise en compte de l'option de désactivation de la synchro en temps réel pour les commandes par mkdgs.
+
+## 4.0.29.0
+
+- Correction sur la date de synchronisation des clients qui se basais sur la date de modification et non celle de création.
+
+## 4.0.28.0
+
+- Ajout de la variable globale ECOMMERCENG_PRODUCT_IN_PURCHASE_WHEN_CREATED pour permettre de mettre les produit creer sur dolibarr lors de la synchronisation au statut 'En achat'.
+- Ne met plus à jour le statut 'En achat' lors de la synchronisation.
+- Ajout des corrections et améliorations de Ewake.
+
 ## 4.0.27.0
 
 - Ajout d'une variable global ECOMMERCENG_WOOCOMMERCE_VAT_NUMBER_META_NAME pour renseigner le nom de la meta donnée correspondant à la TVA client.

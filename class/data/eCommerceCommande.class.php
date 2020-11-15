@@ -327,7 +327,6 @@ class eCommerceCommande
       	    $this->error="Error ".$this->db->lasterror();
             dol_syslog(get_class($this)."::getLastUpdate ".$this->error, LOG_ERR);
         }
-        //return dol_stringtotime('201908101100');
         return $lastdate;
 	}
 

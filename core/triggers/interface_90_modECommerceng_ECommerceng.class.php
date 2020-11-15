@@ -94,7 +94,7 @@ class InterfaceECommerceng
      *      @param      Conf        $conf        Objet conf
      *      @return     int                      <0 if fatal error, 0 si nothing done, >0 if ok
      */
-	function run_trigger($action,$object,$user,$langs,$conf)
+	function runTrigger($action,$object,$user,$langs,$conf)
     {
     	$error=0;
 
@@ -444,6 +444,10 @@ class InterfaceECommerceng
 
                     // Maj date product avec date de modif sur ecommerce
                     if (! $error) {
+                    	
+                    	// Force the ability to run synchDtoEProduct() in case the association with the categories has changed
+		                $eCommerceProduct->last_update = dol_print_date((dol_now() + 10), '%Y-%m-%d %H:%M:%S');
+                    	
                         $sql = "UPDATE " . MAIN_DB_PREFIX . "product SET tms = '" . $eCommerceProduct->last_update . "' WHERE rowid = " . $object->id;
                         $resql = $this->db->query($sql);
                         if (!$resql) {
@@ -494,12 +498,11 @@ class InterfaceECommerceng
                     dol_syslog("Triggers was ran from a create/update to sync from ecommerce to dolibarr, so we won't run code to sync from dolibarr to ecommerce");
                     continue;
                 }
-                
-                 // mkdgs fix
-                    if (empty($site->parameters['realtime_dtoe']['order'])) {
-                        dol_syslog("Triggers disabled from the config of the module");
-                        continue;
-                    }
+
+                if (empty($site->parameters['realtime_dtoe']['order'])) {
+                    dol_syslog("Triggers disabled from the config of the module");
+                    continue;
+                }    
 
                 if (! $error)
                 {
@@ -579,7 +582,6 @@ class InterfaceECommerceng
 
     	        if (! $error)
     	        {
-                    // mkdgs fix
                     if (empty($site->parameters['realtime_dtoe']['order'])) {
                         dol_syslog("Triggers disabled from the config of the module");
                         continue;
@@ -817,10 +819,10 @@ class InterfaceECommerceng
                     dol_syslog("Triggers was ran from a create/update to sync from ecommerce to dolibarr, so we won't run code to sync from dolibarr to ecommerce");
                     continue;
                 }
-
-                if (empty($site->parameters['realtime_dtoe']['order'])) {
-                        dol_syslog("Triggers disabled from the config of the module");
-                        continue;
+		    
+		if (empty($site->parameters['realtime_dtoe']['order'])) {
+                    dol_syslog("Triggers disabled from the config of the module");
+                    continue;
                 }
 
             	try
@@ -934,7 +936,7 @@ class InterfaceECommerceng
                 try
                 {
                     // Do we sync the stock ?
-                    if (! $error && $site->stock_sync_direction == 'dolibarr2ecommerce')
+                    if (! $error && $site->stock_sync_direction == 'dolibarr2ecommerce' && $site->fk_warehouse == $object->entrepot_id)
                     {
                         $eCommerceProduct = new eCommerceProduct($this->db);
                         $eCommerceProduct->fetchByProductId($object->product_id, $site->id);
@@ -942,8 +944,9 @@ class InterfaceECommerceng
                         // Get new qty. We read stock_reel of product. Trigger is called after creating movement and updating table product, so we get total after move.
                         $dbProduct = new Product($this->db);
                         $dbProduct->fetch($object->product_id);
+                        $dbProduct->load_stock();
 
-                        $object->qty_after = $dbProduct->stock_reel;
+                        $object->qty_after = isset($dbProduct->stock_warehouse[$object->entrepot_id]->real) ? $dbProduct->stock_warehouse[$object->entrepot_id]->real : 0;
 
                         if ($eCommerceProduct->remote_id > 0)
                         {
