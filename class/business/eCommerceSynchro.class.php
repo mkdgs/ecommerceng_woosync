@@ -3019,366 +3019,388 @@ class eCommerceSynchro {
                 $product_ref = dol_string_nospecial(trim($product_data['ref']));
                 $new_product = false;
 
-                if (empty($product_ref)) {
-                    $this->errors[] = $this->langs->trans('ECommerceErrorProductRefMandatory');
+                if (empty($product_ref) ) {
+                    $this->warnings[] = $this->langs->trans('ECommerceErrorProductRefMandatory').' ID distant: '.$product_data['remote_id'];
+                }
+
+
+                // Check if product already synchronized
+                $this->initECommerceProduct();
+                $result = $this->eCommerceProduct->fetchByRemoteId($product_data['remote_id'], $this->eCommerceSite->id); // if multiple results return -1
+                if ($result < 0 && !empty($this->eCommerceProduct->error)) {
+                    $this->errors[] = $this->langs->trans('ECommerceErrorFetchProductLinkByRemoteId', $product_data['remote_id'], $this->eCommerceSite->id);
+                    $this->errors[] = $this->eCommerceProduct->error;
                     $error++;
-                } else {
-                    // Check if product already synchronized
-                    $this->initECommerceProduct();
-                    $result = $this->eCommerceProduct->fetchByRemoteId($product_data['remote_id'], $this->eCommerceSite->id);
+                }
+                
+                
+                            
+                // Fetch product
+                if (!$error && $this->eCommerceProduct->fk_product > 0) {
+                    $result = $product->fetch($this->eCommerceProduct->fk_product);
+                    if ($result < 0) {
+                        $this->errors[] = $this->langs->trans('ECommerceErrorFetchProduct', $this->eCommerceProduct->fk_product);
+                        if (!empty($product->error))
+                            $this->errors[] = $product->error;
+                        $this->errors = array_merge($this->errors, $product->errors);
+                        $error++;
+                    }
+                    else {
+                        // @todo check duplicate results for links and cleaning 
+                        //$this->warnings[] = 'Plusieurs liens existe peut-être ID distant: '.$product_data['remote_id'];
+                    }
+                }
+                
+                // @todo check duplicate results for remote_id
+
+                // if no ID,  Fetch product by ref
+                if (!$error && empty($product->id) && !empty($product_ref)) {
+                    $result = $product->fetch('', $product_ref);
+                    if ($result < 0) {
+                        $this->errors[] = $this->langs->trans('ECommerceErrorFetchProductByRef', $product_ref);
+                        if (!empty($product->error))
+                            $this->errors[] = $product->error;
+                        $this->errors = array_merge($this->errors, $product->errors);
+                        $error++;
+                    }
+                }
+                             
+                
+                
+                // if ID, Check if product already synchronized      
+                if (!$error && !empty($product->id)) {
+                    $result = $this->eCommerceProduct->fetchByProductId($product->id, $this->eCommerceSite->id);
                     if ($result < 0 && !empty($this->eCommerceProduct->error)) {
-                        $this->errors[] = $this->langs->trans('ECommerceErrorFetchProductLinkByRemoteId', $product_data['remote_id'], $this->eCommerceSite->id);
+                        $this->errors[] = $this->langs->trans('ECommerceErrorFetchProductLinkByProductId', $product->id, $this->eCommerceSite->id);
                         $this->errors[] = $this->eCommerceProduct->error;
+                        $error++;
+                    } elseif ($result > 0 && $this->eCommerceProduct->remote_id !== $product_data['remote_id']) {
+                        $this->errors[] = $this->langs->trans('ECommerceErrorProductAlreadyLinkedWithRemoteProduct', $product_ref, $this->eCommerceProduct->remote_id);
+                        $error++;
+                    }
+                }
+                /* ... it's just a new product
+                  if (empty($product->id)) {
+                  $this->errors[] = $this->langs->trans('ECommerceErrorFetchProductLinkByRemoteId', $product_ref, $this->eCommerceProduct->remote_id);
+                  $error++;
+                  } */
+
+                // Need to synchronize ?
+                $bypass = !empty($this->eCommerceProduct->last_update) && strtotime($product_data['last_update']) <= strtotime($this->eCommerceProduct->last_update);
+
+                
+                // Update the last update date more recent or create if not found 
+                if (!$error && (empty($product->id) || empty($this->eCommerceProduct->id) || !$bypass)) {
+                    // Set the product
+                    $product->ref = !empty($product_data['ref']) ? dol_string_nospecial(trim($product_data['ref'])) : $product->ref;
+                    $product->ref_ext = $this->eCommerceSite->name . '-' . $product_data['remote_id'];
+                    // if no ref set ref EXT
+                    if( empty($product->ref) ) {
+                        $product->ref = $product->ref_ext;
+                    }
+                    $product->label = $product_data['label'];
+                    $product->description = isset($product_data['description']) ? $product_data['description'] : $product->description;
+                    $product->weight = isset($product_data['weight']) ? $product_data['weight'] : $product->weight;
+                    $product->type = $product_data['fk_product_type'];
+                    $product->finished = $product_data['finished'];
+                    $product->status = $product_data['envente'];
+                    if (isset($product_data['enachat']))
+                        $product->status_buy = $product_data['enachat'];
+
+                    $product->country_id = $product_data['fk_country'];
+                    $product->url = $product_data['url'];
+
+                    if (!isset($product->stock_reel))
+                        $product->stock_reel = 0;
+
+                    if (is_array($product_data['extrafields'])) {
+                        foreach ($product_data['extrafields'] as $key => $value) {
+                            $product->array_options['options_' . $key] = $value;
+                        }
+                    }
+
+                    $product->context['fromsyncofecommerceid'] = $this->eCommerceSite->id;
+
+                    // Update product
+                    if ($product->id > 0) {
+                        if (!empty($conf->global->ECOMMERCENG_ENABLE_LOG_IN_NOTE)) {
+                            $product->note_private = dol_concatdesc($product->note_private, $this->langs->trans('ECommerceUpdateProductFromSiteNote', dol_print_date(dol_now(), 'dayhour'), $this->eCommerceSite->name, $product_data['remote_id']));
+                            if (!empty($conf->global->ECOMMERCENG_ENABLE_DETAILED_UPDATE_LOG_IN_NOTE)) {
+                                $product->note_private = dol_concatdesc($product->note_private . " :", json_encode($product_data['remote_datas']));
+                            }
+                        }
+
+                        $product->error = '';
+                        $product->errors = array();
+                        $result = $product->update($product->id, $this->user);
+                        if ($result < 0) {
+                            $this->errors[] = $this->langs->trans('ECommerceErrorUpdateProduct');
+                        }
+                    } // Create product
+                    else {
+                        $new_product = true;
+                        if (!isset($product_data['enachat']) && !empty($conf->global->ECOMMERCENG_PRODUCT_IN_PURCHASE_WHEN_CREATED))
+                            $product->status_buy = 1;
+                        $product->canvas = $product_data['canvas'];
+                        $product->note_private = isset($order_data['note']) ? $product_data['note'] : "";
+                        if (!empty($conf->global->ECOMMERCENG_ENABLE_LOG_IN_NOTE)) {
+                            $product->note_private = dol_concatdesc($product->note_private, $this->langs->trans('ECommerceCreateProductFromSiteNote', $this->eCommerceSite->name) . " :\n" . json_encode($product_data['remote_datas']));
+                        }
+
+                        $product->error = '';
+                        $product->errors = array();
+                        
+                        $result = $product->create($this->user);
+                        if ($result < 0) {
+                            $this->errors[] = $this->langs->trans('ECommerceErrorCreateProduct').' Ref: '.$product->ref.' - Ref dist:'.$product_data['ref'];
+                        }
+                    }
+                    if ($result < 0) {
+                        if (!empty($product->error))
+                            $this->errors[] = $product->error;
+                        $this->errors = array_merge($this->errors, $product->errors);
+                        if (empty($product->error) && empty($product->errors))
+                            $this->errors[] = $this->db->lasterror();
                         $error++;
                     }
 
-                    // Fetch product
-                    if (!$error && $this->eCommerceProduct->fk_product > 0) {
-                        $result = $product->fetch($this->eCommerceProduct->fk_product);
-                        if ($result < 0) {
-                            $this->errors[] = $this->langs->trans('ECommerceErrorFetchProduct', $this->eCommerceProduct->fk_product);
-                            if (!empty($product->error))
-                                $this->errors[] = $product->error;
-                            $this->errors = array_merge($this->errors, $product->errors);
-                            $error++;
-                        }
-                    }
+                    // Set price
+                    if (!$error) {
+                        if ($new_product) {
+                            // Set price
+                            $price_level = !empty($this->eCommerceSite->price_level) ? $this->eCommerceSite->price_level : 1;
 
-                    // Fetch product by ref
-                    if (!$error && empty($product->id)) {
-                        $result = $product->fetch('', $product_ref);
-                        if ($result < 0) {
-                            $this->errors[] = $this->langs->trans('ECommerceErrorFetchProductByRef', $product_ref);
-                            if (!empty($product->error))
-                                $this->errors[] = $product->error;
-                            $this->errors = array_merge($this->errors, $product->errors);
-                            $error++;
-                        } elseif ($result > 0) {
-                            // Check if product already synchronized
-                            $this->initECommerceProduct();
-                            $result = $this->eCommerceProduct->fetchByProductId($product->id, $this->eCommerceSite->id);
-                            if ($result < 0 && !empty($this->eCommerceProduct->error)) {
-                                $this->errors[] = $this->langs->trans('ECommerceErrorFetchProductLinkByProductId', $product->id, $this->eCommerceSite->id);
-                                $this->errors[] = $this->eCommerceProduct->error;
-                                $error++;
-                            } elseif ($result > 0 && $this->eCommerceProduct->remote_id !== $product_data['remote_id']) {
-                                $this->errors[] = $this->langs->trans('ECommerceErrorProductAlreadyLinkedWithRemoteProduct', $product_ref, $this->eCommerceProduct->remote_id);
+                            // The price type from eCommerce is defined for the site: TI/TE (Tax Include / Tax Excluded)
+                            if (empty($conf->global->PRODUIT_MULTIPRICES)) {
+                                $result = $product->updatePrice($product_data['price'], $this->eCommerceSite->ecommerce_price_type, $this->user, $product_data['tax_rate'], $product_data['price_min']);
+                            } else {
+                                $result = $product->updatePrice($product_data['price'], $this->eCommerceSite->ecommerce_price_type, $this->user, $product_data['tax_rate'], $product_data['price_min'], $price_level);
+                            }
+                            if ($result <= 0) {
+                                $this->errors[] = $this->langs->trans('ECommerceErrorUpdateProductStock');
+                                if (!empty($product->error))
+                                    $this->errors[] = $product->error;
+                                $this->errors = array_merge($this->errors, $product->errors);
                                 $error++;
                             }
-                        }
-                    }
+                        } else {
+                            // Update price if need
+                            $price_level = empty($this->eCommerceSite->price_level) ? 1 : $this->eCommerceSite->price_level;
 
-                    // Need to synchronize ?
-                    $bypass = !empty($this->eCommerceProduct->last_update) && strtotime($product_data['last_update']) <= strtotime($this->eCommerceProduct->last_update);
-
-                    // Update if not found or the last update date more recent
-                    if (!$error && (empty($product->id) || empty($this->eCommerceProduct->id) || !$bypass)) {
-                        // Set the product
-                        $product->ref = !empty($product_data['ref']) ? dol_string_nospecial(trim($product_data['ref'])) : $product->ref;
-                        $product->ref_ext = $this->eCommerceSite->name . '-' . $product_data['remote_id'];
-                        $product->label = $product_data['label'];
-                        $product->description = isset($product_data['description']) ? $product_data['description'] : $product->description;
-                        $product->weight = isset($product_data['weight']) ? $product_data['weight'] : $product->weight;
-                        $product->type = $product_data['fk_product_type'];
-                        $product->finished = $product_data['finished'];
-                        $product->status = $product_data['envente'];
-                        if (isset($product_data['enachat']))
-                            $product->status_buy = $product_data['enachat'];
-
-                        $product->country_id = $product_data['fk_country'];
-                        $product->url = $product_data['url'];
-
-                        if (!isset($product->stock_reel))
-                            $product->stock_reel = 0;
-
-                        if (is_array($product_data['extrafields'])) {
-                            foreach ($product_data['extrafields'] as $key => $value) {
-                                $product->array_options['options_' . $key] = $value;
+                            // Get current product values
+                            if (empty($conf->global->PRODUIT_MULTIPRICES)) {
+                                $price_base_type_org = $product->price_base_type;
+                                $price_org = $product->price;
+                                $price_min_org = $product->price_min;
+                                $tax_rate_org = $product->tva_tx;
+                            } else {
+                                $price_base_type_org = $product->multiprices_base_type[$price_level];
+                                $price_org = $product->multiprices[$price_level];
+                                $price_min_org = $product->multiprices_min[$price_level];
+                                $tax_rate_org = $product->multiprices_tva_tx[$price_level];
                             }
-                        }
 
-                        $product->context['fromsyncofecommerceid'] = $this->eCommerceSite->id;
+                            $price_base_type = $this->eCommerceSite->ecommerce_price_type;
+                            if (isset($product_data['price_base_type']))
+                                $price_base_type = $product_data['price_base_type'];
 
-                        // Update product
-                        if ($product->id > 0) {
-                            if (!empty($conf->global->ECOMMERCENG_ENABLE_LOG_IN_NOTE)) {
-                                $product->note_private = dol_concatdesc($product->note_private, $this->langs->trans('ECommerceUpdateProductFromSiteNote', dol_print_date(dol_now(), 'dayhour'), $this->eCommerceSite->name, $product_data['remote_id']));
-                                if (!empty($conf->global->ECOMMERCENG_ENABLE_DETAILED_UPDATE_LOG_IN_NOTE)) {
-                                    $product->note_private = dol_concatdesc($product->note_private . " :", json_encode($product_data['remote_datas']));
+                            if ($price_base_type_org != $price_base_type ||
+                                    $price_org != $product_data['price'] ||
+                                    (isset($product_data['price_min']) && $price_min_org != $product_data['price_min']) ||
+                                    price2num((float) $product_data['tax_rate']) != price2num((float) $tax_rate_org)
+                            ) {
+                                if ($product_data['price_min'] === '') {
+                                    $product_data['price_min'] = $price_min_org <= $product_data['price'] ? $price_min_org : $product_data['price'];
                                 }
-                            }
-
-                            $product->error = '';
-                            $product->errors = array();
-                            $result = $product->update($product->id, $this->user);
-                            if ($result < 0) {
-                                $this->errors[] = $this->langs->trans('ECommerceErrorUpdateProduct');
-                            }
-                        } // Create product
-                        else {
-                            $new_product = true;
-                            if (!isset($product_data['enachat']) && !empty($conf->global->ECOMMERCENG_PRODUCT_IN_PURCHASE_WHEN_CREATED))
-                                $product->status_buy = 1;
-                            $product->canvas = $product_data['canvas'];
-                            $product->note_private = isset($order_data['note']) ? $product_data['note'] : "";
-                            if (!empty($conf->global->ECOMMERCENG_ENABLE_LOG_IN_NOTE)) {
-                                $product->note_private = dol_concatdesc($product->note_private, $this->langs->trans('ECommerceCreateProductFromSiteNote', $this->eCommerceSite->name) . " :\n" . json_encode($product_data['remote_datas']));
-                            }
-
-                            $product->error = '';
-                            $product->errors = array();
-                            $result = $product->create($this->user);
-                            if ($result < 0) {
-                                $this->errors[] = $this->langs->trans('ECommerceErrorCreateProduct');
-                            }
-                        }
-                        if ($result < 0) {
-                            if (!empty($product->error))
-                                $this->errors[] = $product->error;
-                            $this->errors = array_merge($this->errors, $product->errors);
-                            if (empty($product->error) && empty($product->errors))
-                                $this->errors[] = $this->db->lasterror();
-                            $error++;
-                        }
-
-                        // Set price
-                        if (!$error) {
-                            if ($new_product) {
-                                // Set price
-                                $price_level = !empty($this->eCommerceSite->price_level) ? $this->eCommerceSite->price_level : 1;
-
                                 // The price type from eCommerce is defined for the site: TI/TE (Tax Include / Tax Excluded)
                                 if (empty($conf->global->PRODUIT_MULTIPRICES)) {
-                                    $result = $product->updatePrice($product_data['price'], $this->eCommerceSite->ecommerce_price_type, $this->user, $product_data['tax_rate'], $product_data['price_min']);
+                                    $result = $product->updatePrice($product_data['price'], $price_base_type, $this->user, $product_data['tax_rate'], $product_data['price_min']);
                                 } else {
-                                    $result = $product->updatePrice($product_data['price'], $this->eCommerceSite->ecommerce_price_type, $this->user, $product_data['tax_rate'], $product_data['price_min'], $price_level);
+                                    $result = $product->updatePrice($product_data['price'], $price_base_type, $this->user, $product_data['tax_rate'], $product_data['price_min'], $price_level);
                                 }
                                 if ($result <= 0) {
-                                    $this->errors[] = $this->langs->trans('ECommerceErrorUpdateProductStock');
+                                    $this->errors[] = $this->langs->trans('ECommerceErrorUpdateProductPrice');
                                     if (!empty($product->error))
                                         $this->errors[] = $product->error;
                                     $this->errors = array_merge($this->errors, $product->errors);
                                     $error++;
                                 }
-                            } else {
-                                // Update price if need
-                                $price_level = empty($this->eCommerceSite->price_level) ? 1 : $this->eCommerceSite->price_level;
+                            }
+                        }
+                    }
 
-                                // Get current product values
-                                if (empty($conf->global->PRODUIT_MULTIPRICES)) {
-                                    $price_base_type_org = $product->price_base_type;
-                                    $price_org = $product->price;
-                                    $price_min_org = $product->price_min;
-                                    $tax_rate_org = $product->tva_tx;
+                    // Set stock
+                    if (!$error && ($product->type != Product::TYPE_SERVICE || !empty($conf->global->STOCK_SUPPORTS_SERVICES)) && $this->eCommerceSite->stock_sync_direction == 'ecommerce2dolibarr') {
+                        if (empty($this->eCommerceSite->fk_warehouse)) {
+                            $error++;
+                            $this->errors[] = 'SetupOfWarehouseNotDefinedForThisSite';
+                        } else {
+                            $product->load_stock();
+                            $current_stock = isset($product->stock_warehouse[$this->eCommerceSite->fk_warehouse]->real) ? $product->stock_warehouse[$this->eCommerceSite->fk_warehouse]->real : 0;
+
+                            $new_stock = price2num($product_data['stock_qty'] - $current_stock);
+                            if ($new_stock != 0) {
+                                // Update/init stock
+                                include_once DOL_DOCUMENT_ROOT . '/product/stock/class/mouvementstock.class.php';
+                                $movement = new MouvementStock($this->db);
+                                $movement->context['fromsyncofecommerceid'] = $this->eCommerceSite->id;
+
+                                if (isset($object_origin->element) && isset($object_origin->id) && $object_origin->id > 0) {
+                                    $movement->origin = $object_origin;
+                                }
+                                $lot = $product->status_batch ? '000000' : null;
+                                if ($new_stock < 0) {
+                                    $result = $movement->reception($this->user, $product->id, $this->eCommerceSite->fk_warehouse, $new_stock, 0, $langs->trans($new_product ? 'ECommerceStockInitFromWooSync' : 'ECommerceStockUpdateFromWooSync'), '', '', $lot);
                                 } else {
-                                    $price_base_type_org = $product->multiprices_base_type[$price_level];
-                                    $price_org = $product->multiprices[$price_level];
-                                    $price_min_org = $product->multiprices_min[$price_level];
-                                    $tax_rate_org = $product->multiprices_tva_tx[$price_level];
+                                    $result = $movement->livraison($this->user, $product->id, $this->eCommerceSite->fk_warehouse, $new_stock, 0, $langs->trans($new_product ? 'ECommerceStockInitFromWooSync' : 'ECommerceStockUpdateFromWooSync'), '', '', $lot);
                                 }
-
-                                $price_base_type = $this->eCommerceSite->ecommerce_price_type;
-                                if (isset($product_data['price_base_type']))
-                                    $price_base_type = $product_data['price_base_type'];
-
-                                if ($price_base_type_org != $price_base_type ||
-                                        $price_org != $product_data['price'] ||
-                                        (isset($product_data['price_min']) && $price_min_org != $product_data['price_min']) ||
-                                        price2num((float) $product_data['tax_rate']) != price2num((float) $tax_rate_org)
-                                ) {
-                                    if ($product_data['price_min'] === '') {
-                                        $product_data['price_min'] = $price_min_org <= $product_data['price'] ? $price_min_org : $product_data['price'];
-                                    }
-                                    // The price type from eCommerce is defined for the site: TI/TE (Tax Include / Tax Excluded)
-                                    if (empty($conf->global->PRODUIT_MULTIPRICES)) {
-                                        $result = $product->updatePrice($product_data['price'], $price_base_type, $this->user, $product_data['tax_rate'], $product_data['price_min']);
-                                    } else {
-                                        $result = $product->updatePrice($product_data['price'], $price_base_type, $this->user, $product_data['tax_rate'], $product_data['price_min'], $price_level);
-                                    }
-                                    if ($result <= 0) {
-                                        $this->errors[] = $this->langs->trans('ECommerceErrorUpdateProductPrice');
-                                        if (!empty($product->error))
-                                            $this->errors[] = $product->error;
-                                        $this->errors = array_merge($this->errors, $product->errors);
-                                        $error++;
-                                    }
-                                }
-                            }
-                        }
-
-                        // Set stock
-                        if (!$error && ($product->type != Product::TYPE_SERVICE || !empty($conf->global->STOCK_SUPPORTS_SERVICES)) && $this->eCommerceSite->stock_sync_direction == 'ecommerce2dolibarr') {
-                            if (empty($this->eCommerceSite->fk_warehouse)) {
-                                $error++;
-                                $this->errors[] = 'SetupOfWarehouseNotDefinedForThisSite';
-                            } else {
-                                $product->load_stock();
-                                $current_stock = isset($product->stock_warehouse[$this->eCommerceSite->fk_warehouse]->real) ? $product->stock_warehouse[$this->eCommerceSite->fk_warehouse]->real : 0;
-
-                                $new_stock = price2num($product_data['stock_qty'] - $current_stock);
-                                if ($new_stock != 0) {
-                                    // Update/init stock
-                                    include_once DOL_DOCUMENT_ROOT . '/product/stock/class/mouvementstock.class.php';
-                                    $movement = new MouvementStock($this->db);
-                                    $movement->context['fromsyncofecommerceid'] = $this->eCommerceSite->id;
-
-                                    if (isset($object_origin->element) && isset($object_origin->id) && $object_origin->id > 0) {
-                                        $movement->origin = $object_origin;
-                                    }
-                                    $lot = $product->status_batch ? '000000' : null;
-                                    if ($new_stock < 0) {
-                                        $result = $movement->reception($this->user, $product->id, $this->eCommerceSite->fk_warehouse, $new_stock, 0, $langs->trans($new_product ? 'ECommerceStockInitFromWooSync' : 'ECommerceStockUpdateFromWooSync'), '', '', $lot);
-                                    } else {
-                                        $result = $movement->livraison($this->user, $product->id, $this->eCommerceSite->fk_warehouse, $new_stock, 0, $langs->trans($new_product ? 'ECommerceStockInitFromWooSync' : 'ECommerceStockUpdateFromWooSync'), '', '', $lot);
-                                    }
-                                    if ($result <= 0) {
-                                        $this->errors[] = $this->langs->trans('ECommerceErrorUpdateProductStock');
-                                        if (!empty($movement->error))
-                                            $this->errors[] = $movement->error;
-                                        $this->errors = array_merge($this->errors, $movement->errors);
-                                        $error++;
-                                    }
-                                }
-                            }
-                        }
-
-                        // Set update date of the product with last update date from site
-                        if (!$error) {
-                            $sql = "UPDATE " . MAIN_DB_PREFIX . "product SET tms = '" . $this->db->escape($product_data['last_update']) . "' WHERE rowid = " . $product->id;
-                            $resql = $this->db->query($sql);
-                            if (!$resql) {
-                                $this->errors[] = $this->langs->trans('ECommerceErrorSetProductUpdateDate');
-                                $this->errors[] = $this->db->lasterror();
-                                $error++;
-                            }
-                        }
-
-                        // Set category
-                        if (!$error) {
-                            if (!($this->eCommerceSite->fk_cat_product > 0)) {
-                                $this->errors[] = $this->langs->trans('ECommerceErrorProductCategoryNotConfigured', $this->eCommerceSite->id);
-                                $error++;
-                            } else {
-                                require_once DOL_DOCUMENT_ROOT . '/categories/class/categorie.class.php';
-
-                                $this->initECommerceCategory();
-                                $category_ids = $this->eCommerceCategory->getDolibarrCategoryFromRemoteIds($product_data['categories']);     // Return array of dolibarr category ids found into link table
-                                if (is_array($category_ids)) {
-                                    if (count($category_ids) != count($product_data['categories'])) {
-                                        $result = $this->synchCategory();
-                                        if ($result < 0) {
-                                            $this->errors = array_merge(array($this->langs->trans('ECommerceErrorWhenSynchronizeCategories')), $this->errors);
-                                            $error++;
-                                        } else {
-                                            $category_ids = $this->eCommerceCategory->getDolibarrCategoryFromRemoteIds($product_data['categories']);     // Return array of dolibarr category ids found into link table
-                                        }
-                                    }
-                                }
-
-                                if (is_array($category_ids)) {
-                                    if (count($category_ids) != count($product_data['categories'])) {
-                                        $this->errors = array_merge(array($this->langs->trans('ECommerceErrorNumberCategoryToLinkMismatched', implode(',', $product_data['categories']), implode(',', $category_ids))), $this->errors);
-                                        $error++;
-                                    } else {
-                                        // delete categories
-                                        $cat = new Categorie($this->db);
-                                        $product_category_ids = $cat->containing($product->id, 'product', 'id');
-                                        if (is_array($product_category_ids)) {
-                                            $this->loadProductCategories();
-                                            foreach ($product_category_ids as $product_category_id) {
-                                                if (isset(self::$product_category_cached[$product_category_id])) {
-                                                    $cat = new Categorie($this->db);
-                                                    $cat->fetch($product_category_id);
-                                                    $cat->del_type($product, 'product');
-                                                }
-                                            }
-                                        }
-
-                                        // add categories
-                                        foreach ($category_ids as $category_id) {
-                                            $cat = new Categorie($this->db); // Instanciate a new cat without id (to avoid fetch)
-                                            $cat->id = $category_id;     // Affecting id (for calling add_type)
-                                            $cat->add_type($product, 'product');
-                                        }
-                                    }
-                                } else {
-                                    $cat = new Categorie($this->db);
-                                    $cat->id = $this->eCommerceSite->fk_cat_product;
-                                    $cat->add_type($product, 'product');
-                                }
-                            }
-                        }
-
-                        // Synchronize images
-                        if (!$error) {
-                            $productImageSynchDirection = isset($this->eCommerceSite->parameters['product_synch_direction']['image']) ? $this->eCommerceSite->parameters['product_synch_direction']['image'] : '';
-                            if ($productImageSynchDirection == 'etod' || $productImageSynchDirection == 'all') {
-                                if (is_array($product_data['images'])) {
-                                    foreach ($product_data['images'] as $image) {
-                                        if (!preg_match('@woocommerce/assets/images@i', $image['url'])) {
-                                            $ret = ecommerceng_download_image($image, $product, $error_message);
-                                            if (!$ret) {
-                                                $error++;
-                                                $error_label = $this->langs->trans('ECommerceErrorDownloadProductImage', implode(',', $image), $product->id, $product_data['remote_id'], $this->eCommerceSite->name) . ': ' . $error_message;
-                                                $this->errors[] = $error_label;
-                                                dol_syslog($error_label, LOG_ERR);
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Remove obsolete image
-                                $ret = ecommerceng_remove_obsolete_image($product, $product_data['images'], $error_message);
-                                if (!$ret) {
+                                if ($result <= 0) {
+                                    $this->errors[] = $this->langs->trans('ECommerceErrorUpdateProductStock');
+                                    if (!empty($movement->error))
+                                        $this->errors[] = $movement->error;
+                                    $this->errors = array_merge($this->errors, $movement->errors);
                                     $error++;
-                                    $error_label = $this->langs->trans('ECommerceErrorRemoveObsoleteProductImage', $product->id, $product_data['remote_id'], $this->eCommerceSite->name) . ': ' . $error_message;
-                                    $this->errors[] = $error_label;
-                                    dol_syslog($error_label, LOG_ERR);
                                 }
                             }
                         }
+                    }
 
-                        // Update the link of the synchronization
-                        //--------------------------------------------
-                        if (!$error && !empty($product_data['remote_id'])) {
-                            $this->eCommerceProduct->last_update = $product_data['last_update'];
-                            $this->eCommerceProduct->fk_product = $product->id > 0 ? $product->id : 0;
+                    // Set update date of the product with last update date from site
+                    if (!$error) {
+                        $sql = "UPDATE " . MAIN_DB_PREFIX . "product SET tms = '" . $this->db->escape($product_data['last_update']) . "' WHERE rowid = " . $product->id;
+                        $resql = $this->db->query($sql);
+                        if (!$resql) {
+                            $this->errors[] = $this->langs->trans('ECommerceErrorSetProductUpdateDate');
+                            $this->errors[] = $this->db->lasterror();
+                            $error++;
+                        }
+                    }
 
-                            // Update link
-                            if ($this->eCommerceProduct->id > 0) {
-                                $result = $this->eCommerceProduct->update($this->user);
-                                if ($result < 0) {
-                                    $this->errors[] = $this->langs->trans('ECommerceErrorUpdateProductLink');
-                                }
-                            } // Create link
-                            else {
-                                $this->eCommerceProduct->fk_site = $this->eCommerceSite->id;
-                                $this->eCommerceProduct->remote_id = $product_data['remote_id'];
-                                $result = $this->eCommerceProduct->create($this->user);
-                                if ($result < 0) {
-                                    $this->errors[] = $this->langs->trans('ECommerceErrorCreateProductLink');
+                    // Set category
+                    if (!$error) {
+                        if (!($this->eCommerceSite->fk_cat_product > 0)) {
+                            $this->errors[] = $this->langs->trans('ECommerceErrorProductCategoryNotConfigured', $this->eCommerceSite->id);
+                            $error++;
+                        } else {
+                            require_once DOL_DOCUMENT_ROOT . '/categories/class/categorie.class.php';
+
+                            $this->initECommerceCategory();
+                            $category_ids = $this->eCommerceCategory->getDolibarrCategoryFromRemoteIds($product_data['categories']);     // Return array of dolibarr category ids found into link table
+                            if (is_array($category_ids)) {
+                                if (count($category_ids) != count($product_data['categories'])) {
+                                    $result = $this->synchCategory();
+                                    if ($result < 0) {
+                                        $this->errors = array_merge(array($this->langs->trans('ECommerceErrorWhenSynchronizeCategories')), $this->errors);
+                                        $error++;
+                                    } else {
+                                        $category_ids = $this->eCommerceCategory->getDolibarrCategoryFromRemoteIds($product_data['categories']);     // Return array of dolibarr category ids found into link table
+                                    }
                                 }
                             }
-                            if ($result < 0) {
-                                $this->errors = array_merge($this->errors, $this->eCommerceProduct->errors);
+
+                            if (is_array($category_ids)) {
+                                if (count($category_ids) != count($product_data['categories'])) {
+                                    $this->errors = array_merge(array($this->langs->trans('ECommerceErrorNumberCategoryToLinkMismatched', implode(',', $product_data['categories']), implode(',', $category_ids))), $this->errors);
+                                    $error++;
+                                } else {
+                                    // delete categories
+                                    $cat = new Categorie($this->db);
+                                    $product_category_ids = $cat->containing($product->id, 'product', 'id');
+                                    if (is_array($product_category_ids)) {
+                                        $this->loadProductCategories();
+                                        foreach ($product_category_ids as $product_category_id) {
+                                            if (isset(self::$product_category_cached[$product_category_id])) {
+                                                $cat = new Categorie($this->db);
+                                                $cat->fetch($product_category_id);
+                                                $cat->del_type($product, 'product');
+                                            }
+                                        }
+                                    }
+
+                                    // add categories
+                                    foreach ($category_ids as $category_id) {
+                                        $cat = new Categorie($this->db); // Instanciate a new cat without id (to avoid fetch)
+                                        $cat->id = $category_id;     // Affecting id (for calling add_type)
+                                        $cat->add_type($product, 'product');
+                                    }
+                                }
+                            } else {
+                                $cat = new Categorie($this->db);
+                                $cat->id = $this->eCommerceSite->fk_cat_product;
+                                $cat->add_type($product, 'product');
+                            }
+                        }
+                    }
+
+                    // Synchronize images
+                    if (!$error) {
+                        $productImageSynchDirection = isset($this->eCommerceSite->parameters['product_synch_direction']['image']) ? $this->eCommerceSite->parameters['product_synch_direction']['image'] : '';
+                        if ($productImageSynchDirection == 'etod' || $productImageSynchDirection == 'all') {
+                            if (is_array($product_data['images'])) {
+                                foreach ($product_data['images'] as $image) {
+                                    if (!preg_match('@woocommerce/assets/images@i', $image['url'])) {
+                                        $ret = ecommerceng_download_image($image, $product, $error_message);
+                                        if (!$ret) {
+                                            $error++;
+                                            $error_label = $this->langs->trans('ECommerceErrorDownloadProductImage', implode(',', $image), $product->id, $product_data['remote_id'], $this->eCommerceSite->name) . ': ' . $error_message;
+                                            $this->errors[] = $error_label;
+                                            dol_syslog($error_label, LOG_ERR);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Remove obsolete image
+                            $ret = ecommerceng_remove_obsolete_image($product, $product_data['images'], $error_message);
+                            if (!$ret) {
                                 $error++;
+                                $error_label = $this->langs->trans('ECommerceErrorRemoveObsoleteProductImage', $product->id, $product_data['remote_id'], $this->eCommerceSite->name) . ': ' . $error_message;
+                                $this->errors[] = $error_label;
+                                dol_syslog($error_label, LOG_ERR);
                             }
                         }
+                    }
 
-                        $last_sync_date = 'ECOMMERCE_LAST_SYNC_DATE_PRODUCT_' . $this->eCommerceSite->id;
+                    // Update the link of the synchronization
+                    //--------------------------------------------
+                    if (!$error && !empty($product_data['remote_id'])) {
+                        $this->eCommerceProduct->last_update = $product_data['last_update'];
+                        $this->eCommerceProduct->fk_product = $product->id > 0 ? $product->id : 0;
 
-                        $sync_date = $product_data['create_date'];
-                        if (!empty($product_data['last_update'])) {
-                            $sync_date = strtotime($product_data['last_update']);
-                        }
-
-                        if (!$error && !$bypass && $conf->global->$last_sync_date < $sync_date) {
-                            $result = dolibarr_set_const($this->db, $last_sync_date, $sync_date, 'chaine', 0, '', $conf->entity);
+                        // Update link
+                        if ($this->eCommerceProduct->id > 0) {
+                            $result = $this->eCommerceProduct->update($this->user);
                             if ($result < 0) {
-                                $this->errors[] = $this->langs->trans('ECommerceErrorSetLastSyncDateProduct');
-                                $this->errors[] = $this->db->lasterror();
-                                $error++;
+                                $this->errors[] = $this->langs->trans('ECommerceErrorUpdateProductLink');
                             }
+                        } // Create link
+                        else {
+                            $this->eCommerceProduct->fk_site = $this->eCommerceSite->id;
+                            $this->eCommerceProduct->remote_id = $product_data['remote_id'];
+                            $result = $this->eCommerceProduct->create($this->user);
+                            if ($result < 0) {
+                                $this->errors[] = $this->langs->trans('ECommerceErrorCreateProductLink');
+                            }
+                        }
+                        if ($result < 0) {
+                            $this->errors = array_merge($this->errors, $this->eCommerceProduct->errors);
+                            $error++;
+                        }
+                    }
+
+                    $last_sync_date = 'ECOMMERCE_LAST_SYNC_DATE_PRODUCT_' . $this->eCommerceSite->id;
+
+                    $sync_date = $product_data['create_date'];
+                    if (!empty($product_data['last_update'])) {
+                        $sync_date = strtotime($product_data['last_update']);
+                    }
+
+                    if (!$error && !$bypass && ( (int) $conf->global->$last_sync_date < (int) $sync_date )) {
+                        $result = dolibarr_set_const($this->db, $last_sync_date, $sync_date, 'chaine', 0, '', $conf->entity);
+                        if ($result < 0) {
+                            $this->errors[] = $this->langs->trans('ECommerceErrorSetLastSyncDateProduct');
+                            $this->errors[] = $this->db->lasterror();
+                            $error++;
                         }
                     }
                 }
@@ -3396,7 +3418,7 @@ class eCommerceSynchro {
         }
 
         if ($error) {
-            $this->errors = array_merge(array($this->langs->trans('ECommerceErrorWhenSynchronizeProduct', $product_data['remote_id'])), $this->errors);
+            $this->errors = array_merge(array($this->langs->trans('ECommerceErrorWhenSynchronizeProduct', $product_data['remote_id']).' Ref :'.$product_data['ref']), $this->errors);
             dol_syslog(__METHOD__ . ' Error=' . $this->errorsToString(), LOG_ERR);
             return -1;
         } else {
@@ -4765,9 +4787,9 @@ class eCommerceSynchro {
                                                 $payment->multicurrency_amounts = array();   // Array with all payments dispatching
                                                 $payment->paiementid = $invoice->mode_reglement_id;
                                                 // $payment->num_paiement = $invoice->array_options['options_ecommerceng_online_payment_transaction_id_' . $conf->entity]; # mkdgs
-    /// $order_data['transaction_id'];//
+                                                /// $order_data['transaction_id'];//
                                                 $ref = ( empty($invoice->array_options['options_ecommerceng_online_payment_transaction_id_' . $conf->entity]) ) ? '' : $invoice->array_options['options_ecommerceng_online_payment_transaction_id_' . $conf->entity];
-                                                $payment->num_paiement = 'ref: '.$ref; # mkdgs
+                                                $payment->num_paiement = 'ref: ' . $ref; # mkdgs
                                                 //$payment->type_label =  $invoice->mode_reglement_id;
                                                 //$payment->type_code = $ref;
                                                 $payment->note = 'Created by WooSync';

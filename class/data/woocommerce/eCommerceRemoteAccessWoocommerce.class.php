@@ -997,9 +997,11 @@ class eCommerceRemoteAccessWoocommerce {
         ];
 
         // Synchronize ref
-        if ($productRefSynchDirection == 'etod' || $productRefSynchDirection == 'all') {
-            $product['ref'] = $remote_data->sku;
-        }
+        //if ($productRefSynchDirection == 'etod' || $productRefSynchDirection == 'all') {
+        //    $product['ref'] = $remote_data->sku;           
+        // }
+        $product['ref'] = $remote_data->sku; // we always need the sku, for search prduct link by reference
+        
         // Synchronize short and long description
         if ($productDescriptionSynchDirection == 'etod' || $productDescriptionSynchDirection == 'all') {
             $product['extrafields']["ecommerceng_description_{$conf->entity}"] = $this->replace4byte($remote_data->description);
